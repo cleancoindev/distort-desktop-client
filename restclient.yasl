@@ -1,0 +1,4 @@
+const x = json($)
+echo x
+
+
