@@ -13,6 +13,11 @@ public:
     std::string getAccount() const;
     std::string getAuthToken() const;
 
+    void setHomeserver(std::string homeserver);
+    void setPeerId(std::string peerId);
+    void setAccount(std::string account);
+    void setAuthToken(std::string authToken);
+
 private:
     std::string homeserver;
     std::string peerId;

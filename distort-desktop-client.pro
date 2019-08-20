@@ -1,4 +1,4 @@
-#-------------------------------------------------
+l#-------------------------------------------------
 #
 # Project created by QtCreator 2019-08-10T15:51:38
 #
@@ -40,7 +40,8 @@ SOURCES += \
         messagewidget.cpp \
         peer.cpp \
         restclient.cpp \
-        signindialog.cpp
+        signindialog.cpp \
+        signinworker.cpp
 
 HEADERS += \
         account.h \
@@ -57,7 +58,8 @@ HEADERS += \
         messagewidget.h \
         peer.h \
         restclient.h \
-        signindialog.h
+        signindialog.h \
+        signinworker.h
 
 FORMS += \
         conversationwidget.ui \

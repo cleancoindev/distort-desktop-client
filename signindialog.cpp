@@ -1,12 +1,6 @@
 #include "signindialog.h"
 #include "ui_signindialog.h"
-#include "restclient.h"
-#include "distortexception.h"
-
-#include <curlpp/cURLpp.hpp>
-#include <cryptopp/pwdbased.h>
-#include <cryptopp/sha.h>
-#include <cryptopp/base64.h>
+#include "signinworker.h"
 
 SignInDialog::SignInDialog(QWidget *parent) :
     QDialog(parent), ui(new Ui::SignInDialog), acc(nullptr), authParams(nullptr)
@@ -14,11 +8,23 @@ SignInDialog::SignInDialog(QWidget *parent) :
 {
     ui->setupUi(this);
     setWindowTitle("Sign In");
+
+    SignInWorker *worker = new SignInWorker;
+    worker->moveToThread(&signInThread);
+    connect(&signInThread, &QThread::finished, worker, &QObject::deleteLater);
+    connect(this, &SignInDialog::performSignIn, worker, &SignInWorker::doWork);
+    connect(worker, &SignInWorker::success, this, &SignInDialog::onSuccess);
+    connect(worker, &SignInWorker::failure, this, &SignInDialog::onFailure);
+    signInThread.start();
 }
 
 SignInDialog::~SignInDialog()
 {
+    QApplication::restoreOverrideCursor();
+
     delete ui;
+    signInThread.quit();
+    signInThread.wait(3000);
 }
 
 std::shared_ptr<AuthParams> SignInDialog::getAuthParams() const
@@ -33,7 +39,13 @@ void SignInDialog::accept()
     {
         return ui->errorLabel->setText("Must specify a homeserver network address");
     }*/
-    homeserver = homeserver.empty() ? "http://localhost:6945" : homeserver;
+    homeserver = homeserver.empty() ? "http://localhost:6945/" : homeserver;
+
+    // Ensure homeserver URL's end with '/' for consistency in request-path appending
+    if(homeserver.back() != '/') {
+        homeserver += '/';
+    }
+
     std::string account = ui->accountEdit->text().toStdString();
     account = account.empty() ? "root" : account;
     std::string password = ui->passwordEdit->text().toStdString();
@@ -42,55 +54,21 @@ void SignInDialog::accept()
         return ui->errorLabel->setText("Password field cannot be empty");
     }
 
-    try
-    {
-        // Ensure homeserver URL's end with '/' for consistency in request-path appending
-        if(homeserver.back() != '/') {
-            homeserver += '/';
-        }
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    emit performSignIn(homeserver, account, password);
+}
 
-        std::string peerId = "QmemJHsMDuBjUCAyiWeVdct2LGHqtZhu8QQCt8ZQVbY1qz";
+void SignInDialog::onSuccess(AuthParams* auth)
+{
+    QApplication::restoreOverrideCursor();
 
-        // PBKDF2
-        CryptoPP::PKCS5_PBKDF2_HMAC<CryptoPP::SHA256> sha256;
-        std::shared_ptr<uint8_t> buffer(new uint8_t[32]);
-        sha256.DeriveKey(buffer.get(), 32, 0, (const uint8_t*)password.c_str(), password.size(), (const uint8_t*)peerId.c_str(), 46, 1000);
-        CryptoPP::Base64Encoder encoder;
-        encoder.Put(buffer.get(), 32);
-        encoder.MessageEnd();
-        uint64_t size = encoder.MaxRetrievable();
-        std::shared_ptr<char> encodedAuth(new char[size]);
-        encoder.Get((uint8_t*)encodedAuth.get(), size);
-
-        std::string authToken(encodedAuth.get(), size);
-        authParams = std::make_shared<AuthParams>(AuthParams(homeserver, peerId, account, authToken));
-        RestClient::sendDistortUnauthGet(homeserver + "ipfs", RestClient::emptyParams);
-
-        RestClient::sendDistortAuthGet("account", *authParams, RestClient::emptyParams);
-
-
-        // Update password
-        /*std::map<std::string, std::string> newSettings;
-        newSettings.insert(std::pair<std::string, std::string>("authToken", "+I1CLkFxN/UhArBYMN8iVG4NdHMLt/oqig5Rzx+kiVM="));
-        RestClient::sendDistortAuthRequest("PUT", "account", *authParams, RestClient::emptyParams, newSettings);*/
-    }
-    catch(DistortException e)
-    {
-        std::cerr << "ERROR: " << e.what() << std::endl;
-
-        // TODO: Handle response codes with specific error messages
-        switch(e.getResponseCode())
-        {
-        case 500:
-            return ui->errorLabel->setText("An internal server error occurred");
-        default:
-            return ui->errorLabel->setText(e.what());
-        }
-    }
-    catch(curlpp::RuntimeError& e)
-    {
-        return ui->errorLabel->setText(e.what());
-    }
-
+    authParams.reset(auth);
     done(Accepted);
+}
+
+void SignInDialog::onFailure(std::string e)
+{
+    QApplication::restoreOverrideCursor();
+
+    return ui->errorLabel->setText(e.c_str());
 }

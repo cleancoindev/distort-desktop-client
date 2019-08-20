@@ -63,14 +63,21 @@ MainWindow::MainWindow(QWidget *parent) :
     std::deque<std::shared_ptr<Message>> messages;
     for(uint64_t i = 0; i < 2; i++)
     {
-        std::shared_ptr<Message> m(new Message("hello", "hello to you good sir, the one I see befor eme on this splendiferous day. I see you are doing just fine over there", i));
+        std::shared_ptr<Message> m(new Message("hello", "hello to you good sir, the one I see before me on this splendiferous day. I see you are doing just fine over there", i));
         messages.push_back(m);
     }
-    std::shared_ptr<Message> m(new Message("hello", "hello to you 12345678901234567890123456789012345678901234567890123456789012345678901234567890"
-                                                    "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz", 2));
-    messages.push_back(m);
     messageModel = new MessageListModel(messages, this);
     ui->messagesList->setModel(messageModel);
+
+    std::shared_ptr<Message> m(new Message("hello", "hello to you 12345678901234567890123456789012345678901234567890123456789012345678901234567890"
+                                                    "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"
+                                                    "1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz", 2));
+    std::shared_ptr<Message> m4(new Message("hello", "More tests X 4", 4));
+    std::shared_ptr<Message> m3(new Message("hello", "More tests X 3", 3));
+    messageModel->addOrUpdateMessage(m);
+    messageModel->addOrUpdateMessage(m4);
+    messageModel->addOrUpdateMessage(m3);
+    m3->setMessage("More tests X 3 -- EDIT");
 
 
     // Setup groups

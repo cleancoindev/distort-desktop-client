@@ -40,7 +40,7 @@ void MessageDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 
     QFont font("Times New Roman", 12);
     QFontMetrics fm(font);
-    int l = fm.width(message);
+    int l = fm.horizontalAdvance(message);
     int height = fm.height();
     int r = l / MAX_MESSAGE_WIDTH + 1;
 
@@ -67,7 +67,7 @@ void MessageDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
         do
         {
             text = message.mid(charStart, ++charEnd - charStart);
-        } while(fm.width(text) < MESSAGE_WIDTH-(2*MARGIN) && charEnd < message.length());
+        } while(fm.horizontalAdvance(text) < MESSAGE_WIDTH-(2*MARGIN) && charEnd < message.length());
         charEnd = charEnd < message.length() ? charEnd-1 : charEnd;
         text = message.mid(charStart, charEnd - charStart);
         charStart = charEnd;
@@ -110,7 +110,7 @@ QSize MessageDelegate::sizeHint(const QStyleOptionViewItem& option, const QModel
     QString message = index.data(MessageListModel::messageRole).toString();
     QFont f("Times New Roman", 12);
     QFontMetrics fm(f);
-    int l = fm.width(message);
+    int l = fm.horizontalAdvance(message);
     int height = fm.height();
     int r = l / result.width() + 1;
 

@@ -39,3 +39,29 @@ QVariant MessageListModel::data(const QModelIndex &index, int role) const
         return QVariant();
     }
 }
+
+void MessageListModel::addOrUpdateMessage(std::shared_ptr<Message> m)
+{
+    // Logarithmic binary search
+    auto start = messages.begin();
+    auto end = messages.end();
+    auto it = end;
+    while(start < end) {
+        auto mid = (end-start)/2 + start;
+        uint64_t j = mid->get()->getIndex();
+        if(j == m->getIndex()) {
+            it = mid;
+            break;
+        } else if(j < m->getIndex()) {
+            start = mid+1;
+        } else {
+            end = mid;
+        }
+    }
+
+    if(it == messages.end() || it->get()->getIndex() > m->getIndex()) {
+        messages.insert(end, m);
+    } else {
+        *it = m;
+    }
+}

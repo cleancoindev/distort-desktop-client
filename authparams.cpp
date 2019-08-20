@@ -28,3 +28,23 @@ std::string AuthParams::getAuthToken() const
 {
     return authToken;
 }
+
+void AuthParams::setHomeserver(std::string h)
+{
+    homeserver = h;
+}
+
+void AuthParams::setPeerId(std::string p)
+{
+    peerId = p;
+}
+
+void AuthParams::setAccount(std::string a)
+{
+    account = a;
+}
+
+void AuthParams::setAuthToken(std::string a)
+{
+    authToken = a;
+}

@@ -3,9 +3,12 @@
 
 #include "account.h"
 #include "authparams.h"
+#include "distortexception.h"
 
 #include <QDialog>
+#include <QThread>
 #include <memory>
+#include <curlpp/Easy.hpp>
 
 namespace Ui {
 class SignInDialog;
@@ -21,13 +24,21 @@ public:
 
     std::shared_ptr<AuthParams> getAuthParams() const;
 
-private slots:
-    void accept();
+public slots:
+    void onSuccess(AuthParams* authParams);
+    void onFailure(std::string e);
+
+signals:
+    void performSignIn(std::string homeserver, std::string account, std::string password);
 
 private:
     Ui::SignInDialog *ui;
     std::shared_ptr<Account> acc;
     std::shared_ptr<AuthParams> authParams;
+    QThread signInThread;
+
+private slots:
+    void accept();
 };
 
 #endif // SIGNINDIALOG_H
