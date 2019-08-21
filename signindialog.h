@@ -8,7 +8,6 @@
 #include <QDialog>
 #include <QThread>
 #include <memory>
-#include <curlpp/Easy.hpp>
 
 namespace Ui {
 class SignInDialog;

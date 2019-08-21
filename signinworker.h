@@ -5,7 +5,6 @@
 #include "distortexception.h"
 
 #include <QObject>
-#include <curlpp/Easy.hpp>
 
 class SignInWorker : public QObject
 {

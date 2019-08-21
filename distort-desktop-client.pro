@@ -77,7 +77,18 @@ unix|win32: LIBS += -lcurlpp -lcurl
 
 unix|win32: LIBS += -lcryptopp
 
-unix|win32: LIBS += -lyaslapi
-
 DISTFILES += \
     restclient.yasl
+
+unix|win32: LIBS += -L$$PWD/yasl/ -lyaslapi
+
+INCLUDEPATH += $$PWD/yasl
+DEPENDPATH += $$PWD/yasl
+
+yaslTarget.target = $$PWD/yasl/libyaslapi.a
+yaslTarget.depends = FORCE
+win32: yaslTarget.commands = copy $$PWD/json.yasl/json.c $$PWD/yasl/json.c ; cmake --configure $$PWD/yasl ; cmake --build $$PWD/yasl
+else: yaslTarget.commands = cp $$PWD/json.yasl/json.c $$PWD/yasl/json.c ; cmake --configure $$PWD/yasl ; cmake --build $$PWD/yasl
+
+PRE_TARGETDEPS += $$PWD/yasl/libyaslapi.a
+QMAKE_EXTRA_TARGETS += yaslTarget
