@@ -1,6 +1,4 @@
 [submodule "yasl"]
 	path = yasl
-	url = https://github.com/yasl-lang/yasl
-[submodule "json.yasl"]
-	path = json.yasl
-	url = https://github.com/CoffeeTableEspresso/json.yasl
+	url = https://github.com/ryco117/yasl
+
