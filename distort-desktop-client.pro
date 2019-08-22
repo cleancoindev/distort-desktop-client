@@ -87,8 +87,8 @@ DEPENDPATH += $$PWD/yasl
 
 yaslTarget.target = $$PWD/yasl/libyaslapi.a
 yaslTarget.depends = FORCE
-win32: yaslTarget.commands = copy $$PWD/json.yasl/json.c $$PWD/yasl/json.c ; cmake --configure $$PWD/yasl ; cmake --build $$PWD/yasl
-else: yaslTarget.commands = cp $$PWD/json.yasl/json.c $$PWD/yasl/json.c ; cmake --configure $$PWD/yasl ; cmake --build $$PWD/yasl
+win32: yaslTarget.commands = cd $$PWD/yasl ; cmake --configure . ; cmake --build . ; cd ..
+else: yaslTarget.commands = cd $$PWD/yasl ; cmake --configure . ; cmake --build . ; cd ..
 
 PRE_TARGETDEPS += $$PWD/yasl/libyaslapi.a
 QMAKE_EXTRA_TARGETS += yaslTarget
