@@ -32,6 +32,7 @@ SOURCES += \
         distortexception.cpp \
         group.cpp \
         groupwidget.cpp \
+        json.yasl/json.c \
         main.cpp \
         mainwindow.cpp \
         message.cpp \
@@ -51,6 +52,7 @@ HEADERS += \
         distortexception.h \
         group.h \
         groupwidget.h \
+        json.yasl/json.h \
         mainwindow.h \
         message.h \
         messagedelegate.h \
@@ -80,8 +82,6 @@ unix|win32: LIBS += -lcryptopp
 DISTFILES += \
     restclient.yasl
 
-unix|win32: LIBS += -L$$PWD/yasl/ -lyaslapi
-
 INCLUDEPATH += $$PWD/yasl
 DEPENDPATH += $$PWD/yasl
 
@@ -92,3 +92,5 @@ else: yaslTarget.commands = cd $$PWD/yasl ; cmake --configure . ; cmake --build 
 
 PRE_TARGETDEPS += $$PWD/yasl/libyaslapi.a
 QMAKE_EXTRA_TARGETS += yaslTarget
+
+unix|win32: LIBS += -L$$PWD/yasl/ -lyaslapi

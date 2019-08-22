@@ -6,7 +6,12 @@
 #include <curlpp/Options.hpp>
 #include <curlpp/Infos.hpp>
 #include <sstream>
-#include "yasl/yasl.h"
+
+extern "C"
+{
+    #include "yasl/yasl.h"
+    #include "json.yasl/json.h"
+}
 
 std::string encodeParams(const std::map<std::string, std::string>& params)
 {

@@ -1,3 +1,7 @@
 [submodule "yasl"]
 	path = yasl
 	url = https://github.com/yasl-lang/yasl
+	branch = v0.6.3
+[submodule "json.yasl"]
+	path = json.yasl
+	url = https://github.com/coffeetableespresso/json.yasl
