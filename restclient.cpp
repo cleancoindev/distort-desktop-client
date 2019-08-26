@@ -31,7 +31,7 @@ std::string encodeParams(const std::map<std::string, std::string>& params)
     return r.str();
 }
 
-void send(std::string method, std::string url, const std::map<std::string, std::string>& queryParams, const std::map<std::string, std::string>& bodyParams, const AuthParams* authParams = nullptr)
+YASL_Object* send(std::string method, std::string url, const std::map<std::string, std::string>& queryParams, const std::map<std::string, std::string>& bodyParams, const AuthParams* authParams = nullptr)
 {
     curlpp::Easy req;
     req.setOpt<curlpp::options::Timeout>(3);
@@ -70,46 +70,51 @@ void send(std::string method, std::string url, const std::map<std::string, std::
     long httpCode = cURLpp::Infos::ResponseCode::get(req);
     if(httpCode != 200)
     {
-        std::cout << "TEST " << httpCode << " " << result.str() << std::endl;
+        std::cerr << "ERROR: " << httpCode << " " << result.str() << std::endl;
 
         // TODO: Extract error from JSON
         throw(DistortException(httpCode, result.str()));
     }
 
-    YASL_State *S = YASL_newstate((char *)"../distort-desktop-client/restclient.yasl");
+    char* s = (char *)malloc(result.str().length() + 1);
+    result.str().copy(s, result.str().length());
+
+    YASL_State *S = YASL_newstate((char *)"scripts/restclient.yasl");
     if (!S) {
-        std::cout << "can't find it" << std::endl;
+        std::cerr << "can't find it" << std::endl;
     }
 
     YASL_load_json(S);
-    char *tmp = (char *)malloc(result.str().length());
-    result.str().copy(tmp, result.str().length());
     YASL_declglobal(S, "$");
-    YASL_pushstring(S, tmp, result.str().length());
+    YASL_pushszstring(S, s);
     YASL_setglobal(S, "$");
-
-    int status = YASL_execute(S);
-
+    if(int status = YASL_execute(S) != YASL_MODULE_SUCCESS)
+    {
+        std::cerr << "module failed" << std::endl;
+    }
+    YASL_Object* object = YASL_popobject(S);
     YASL_delstate(S);
+
+    return object;
 }
 
-void RestClient::sendDistortAuthRequest(std::string method, std::string requestPath, const AuthParams& authParams, const std::map<std::string, std::string>& queryParams, const std::map<std::string, std::string>& bodyParams)
+YASL_Object* RestClient::sendDistortAuthRequest(std::string method, std::string requestPath, const AuthParams& authParams, const std::map<std::string, std::string>& queryParams, const std::map<std::string, std::string>& bodyParams)
 {
     std::string url = authParams.getHomeserver() + requestPath;
     return send(method, url, queryParams, bodyParams, &authParams);
 }
 
-void RestClient::sendDistortUnauthRequest(std::string method, std::string url, const std::map<std::string, std::string>& queryParams, const std::map<std::string, std::string>& bodyParams)
+YASL_Object* RestClient::sendDistortUnauthRequest(std::string method, std::string url, const std::map<std::string, std::string>& queryParams, const std::map<std::string, std::string>& bodyParams)
 {
     return send(method, url, queryParams, bodyParams);
 }
 
-void RestClient::sendDistortAuthGet(std::string requestPath, const AuthParams& authParams, const std::map<std::string, std::string>& queryParams)
+YASL_Object* RestClient::sendDistortAuthGet(std::string requestPath, const AuthParams& authParams, const std::map<std::string, std::string>& queryParams)
 {
     return sendDistortAuthRequest("GET", requestPath, authParams, queryParams, emptyParams);
 }
 
-void RestClient::sendDistortUnauthGet(std::string url, const std::map<std::string, std::string>& queryParams)
+YASL_Object* RestClient::sendDistortUnauthGet(std::string url, const std::map<std::string, std::string>& queryParams)
 {
     return sendDistortUnauthRequest("GET", url, queryParams, emptyParams);
 }

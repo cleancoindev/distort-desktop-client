@@ -1,4 +1,5 @@
+
 const x = json($)
 echo x
 
-
+export x

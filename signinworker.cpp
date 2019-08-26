@@ -18,13 +18,13 @@ void SignInWorker::doWork(std::string homeserver, std::string account, std::stri
 
         // PBKDF2
         CryptoPP::PKCS5_PBKDF2_HMAC<CryptoPP::SHA256> sha256;
-        std::shared_ptr<uint8_t> buffer(new uint8_t[32]);
+        std::shared_ptr<uint8_t[]> buffer(new uint8_t[32]);
         sha256.DeriveKey(buffer.get(), 32, 0, (const uint8_t*)password.c_str(), password.size(), (const uint8_t*)peerId.c_str(), 46, 1000);
         CryptoPP::Base64Encoder encoder;
         encoder.Put(buffer.get(), 32);
         encoder.MessageEnd();
         uint64_t size = encoder.MaxRetrievable();
-        std::shared_ptr<char> encodedAuth(new char[size]);
+        std::shared_ptr<char[]> encodedAuth(new char[size]);
         encoder.Get((uint8_t*)encodedAuth.get(), size);
         std::string authToken(encodedAuth.get(), size);
 

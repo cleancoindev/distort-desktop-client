@@ -26,7 +26,9 @@ CONFIG += c++11
 
 SOURCES += \
         account.cpp \
+        atomicstate.cpp \
         authparams.cpp \
+        backgroundworker.cpp \
         conversation.cpp \
         conversationwidget.cpp \
         distortexception.cpp \
@@ -46,7 +48,9 @@ SOURCES += \
 
 HEADERS += \
         account.h \
+        atomicstate.h \
         authparams.h \
+        backgroundworker.h \
         conversation.h \
         conversationwidget.h \
         distortexception.h \
@@ -80,17 +84,27 @@ unix|win32: LIBS += -lcurlpp -lcurl
 unix|win32: LIBS += -lcryptopp
 
 DISTFILES += \
-    restclient.yasl
+    scripts/restclient.yasl
 
+## Include YASL
 INCLUDEPATH += $$PWD/yasl
 DEPENDPATH += $$PWD/yasl
 
-yaslTarget.target = $$PWD/yasl/libyaslapi.a
+yaslTarget.target = $$shell_path($$PWD/yasl/libyaslapi.a)
 yaslTarget.depends = FORCE
 win32: yaslTarget.commands = cd $$PWD/yasl ; cmake --configure . ; cmake --build . ; cd ..
 else: yaslTarget.commands = cd $$PWD/yasl ; cmake --configure . ; cmake --build . ; cd ..
 
-PRE_TARGETDEPS += $$PWD/yasl/libyaslapi.a
+PRE_TARGETDEPS += $$shell_path($$PWD/yasl/libyaslapi.a)
 QMAKE_EXTRA_TARGETS += yaslTarget
 
 unix|win32: LIBS += -L$$PWD/yasl/ -lyaslapi
+
+
+## Copy YASL scripts
+# https://stackoverflow.com/a/39234363
+copydata.commands = $(COPY_DIR) \"$$shell_path($$PWD/scripts)\" \"$$shell_path($$OUT_PWD)\"
+first.depends = $(first) copydata
+export(first.depends)
+export(copydata.commands)
+QMAKE_EXTRA_TARGETS += first copydata
