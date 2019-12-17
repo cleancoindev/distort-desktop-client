@@ -1,14 +1,11 @@
 #include "message.h"
 
-Message::Message(QString fromStr, QString messageStr, uint64_t i) :
-    from(fromStr), message(messageStr), index(i)
-{
-}
+const QString Message::TYPE_IN("IN");
+const QString Message::TYPE_OUT("OUT");
 
-QString Message::getFrom() const
-{
-    return from;
-}
+Message::Message(QString messageStr, uint64_t i) :
+    message(messageStr), index(i)
+{}
 
 QString Message::getMessage() const
 {
@@ -18,11 +15,6 @@ QString Message::getMessage() const
 uint64_t Message::getIndex() const
 {
     return index;
-}
-
-void Message::setFrom(QString f)
-{
-    from = f;
 }
 
 void Message::setMessage(QString m)

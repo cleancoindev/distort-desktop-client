@@ -1,0 +1,3 @@
+const e = (json($) ?? {}).error ?? $->tostr()
+echo "GETERROR: #{e}"
+export e

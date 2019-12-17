@@ -31,18 +31,13 @@ std::string encodeParams(const std::map<std::string, std::string>& params)
     return r.str();
 }
 
-YASL_Object* send(std::string method, std::string url, const std::map<std::string, std::string>& queryParams, const std::map<std::string, std::string>& bodyParams, const AuthParams* authParams = nullptr)
+QString RestClient::send(std::string method, std::string request, std::string postFieldBody, const AuthParams* authParams)
 {
     curlpp::Easy req;
     req.setOpt<curlpp::options::Timeout>(3);
     req.setOpt(new curlpp::options::CustomRequest{method});
 
-    // Set the URL, including any query parameters
-    if(queryParams.size() > 0)
-    {
-        url += "?" + encodeParams(queryParams);
-    }
-    req.setOpt<curlpp::options::Url>(url);
+    req.setOpt<curlpp::options::Url>(request);
 
     // Set the header with auth params
     std::list<std::string> header;
@@ -50,16 +45,16 @@ YASL_Object* send(std::string method, std::string url, const std::map<std::strin
     header.push_back("Content-Type: application/x-www-form-urlencoded");
     if(authParams != nullptr)
     {
-        header.push_back("peerid: " + authParams->getPeerId());
-        header.push_back("accountname: " + authParams->getAccount());
-        header.push_back("authtoken: " + authParams->getAuthToken());
+        header.push_back(("peerid: " + authParams->getPeerId()).toStdString());
+        header.push_back(("accountname: " + authParams->getAccount()).toStdString());
+        header.push_back(("authtoken: " + authParams->getAuthToken()).toStdString());
     }
 
     req.setOpt<curlpp::options::HttpHeader>(header);
 
-    if(bodyParams.size() != 0)
+    if(postFieldBody.size() > 0)
     {
-        req.setOpt<curlpp::options::PostFields>(encodeParams(bodyParams));
+        req.setOpt<curlpp::options::PostFields>(postFieldBody);
     }
 
     // Send request and get a result.
@@ -70,51 +65,118 @@ YASL_Object* send(std::string method, std::string url, const std::map<std::strin
     long httpCode = cURLpp::Infos::ResponseCode::get(req);
     if(httpCode != 200)
     {
-        std::cerr << "ERROR: " << httpCode << " " << result.str() << std::endl;
-
-        // TODO: Extract error from JSON
-        throw(DistortException(httpCode, result.str()));
+        throw(DistortException(httpCode, QString::fromStdString(result.str())));
     }
 
-    char* s = (char *)malloc(result.str().length() + 1);
-    result.str().copy(s, result.str().length());
+    return QString::fromStdString(result.str());
+}
 
-    YASL_State *S = YASL_newstate((char *)"scripts/restclient.yasl");
-    if (!S) {
-        std::cerr << "can't find it" << std::endl;
-    }
-
-    YASL_load_json(S);
-    YASL_declglobal(S, "$");
-    YASL_pushszstring(S, s);
-    YASL_setglobal(S, "$");
-    if(int status = YASL_execute(S) != YASL_MODULE_SUCCESS)
+QString RestClient::sendDistortAuthRequest(std::string method, std::string requestPath, const AuthParams& authParams,
+                                           const std::map<std::string, std::string>& queryParams, const std::map<std::string, std::string>& bodyParams)
+{
+    // Set the URL, including any query parameters
+    std::string url = authParams.getHomeserver().toStdString() + requestPath;
+    if(queryParams.size() > 0)
     {
-        std::cerr << "module failed" << std::endl;
+        url += "?" + encodeParams(queryParams);
     }
-    YASL_Object* object = YASL_popobject(S);
-    YASL_delstate(S);
 
-    return object;
+    return send(method, url, encodeParams(bodyParams), &authParams);
 }
 
-YASL_Object* RestClient::sendDistortAuthRequest(std::string method, std::string requestPath, const AuthParams& authParams, const std::map<std::string, std::string>& queryParams, const std::map<std::string, std::string>& bodyParams)
+QString RestClient::sendDistortUnauthRequest(std::string method, std::string url, const std::map<std::string, std::string>& queryParams, const std::map<std::string, std::string>& bodyParams)
 {
-    std::string url = authParams.getHomeserver() + requestPath;
-    return send(method, url, queryParams, bodyParams, &authParams);
+    // Set the URL, including any query parameters
+    if(queryParams.size() > 0)
+    {
+        url += "?" + encodeParams(queryParams);
+    }
+
+    return send(method, url, encodeParams(bodyParams));
 }
 
-YASL_Object* RestClient::sendDistortUnauthRequest(std::string method, std::string url, const std::map<std::string, std::string>& queryParams, const std::map<std::string, std::string>& bodyParams)
-{
-    return send(method, url, queryParams, bodyParams);
-}
-
-YASL_Object* RestClient::sendDistortAuthGet(std::string requestPath, const AuthParams& authParams, const std::map<std::string, std::string>& queryParams)
+QString RestClient::sendDistortAuthGet(std::string requestPath, const AuthParams& authParams, const std::map<std::string, std::string>& queryParams)
 {
     return sendDistortAuthRequest("GET", requestPath, authParams, queryParams, emptyParams);
 }
 
-YASL_Object* RestClient::sendDistortUnauthGet(std::string url, const std::map<std::string, std::string>& queryParams)
+QString RestClient::sendDistortUnauthGet(std::string url, const std::map<std::string, std::string>& queryParams)
 {
     return sendDistortUnauthRequest("GET", url, queryParams, emptyParams);
+}
+
+
+
+// TODO: DELETE THIS
+#include <cstring>
+namespace
+{
+    void patch_pushcstring(YASL_State* S, const char* cstr)
+    {
+        size_t len = strlen(cstr) + 1;
+        char* c = (char*)malloc(len);
+        memcpy(c, cstr, len);
+
+        YASL_pushszstring(S, c);
+    }
+}
+
+QString RestClient::getError(QString response)
+{
+    // Retrieve Distort error from JSON using new YASL state
+    YASL_State *S = YASL_newstate("scripts/geterror.yasl");
+    if (!S) {
+        std::cerr << "scripts/geterror.yasl: can't find it" << std::endl;
+        return response;
+    }
+
+    // Configure state to parse JSON
+    YASL_load_json(S);
+    YASL_declglobal(S, "$");
+    patch_pushcstring(S, response.toUtf8());
+    YASL_setglobal(S, "$");
+
+    // Execute script
+    if(int status = YASL_execute(S) != YASL_MODULE_SUCCESS)
+    {
+        std::cerr << "scripts/geterror.yasl: module failed" << std::endl;
+        return response;
+    }
+
+    // Get error message from script
+    YASL_Object* errorObj = YASL_popobject(S);
+    QString error = QString::fromUtf8(YASL_getstring(errorObj), YASL_getstringlen(errorObj));
+    YASL_delstate(S);
+
+    return error;
+}
+
+QString RestClient::getMessage(QString response)
+{
+    // Retrieve Distort message from JSON using new YASL state
+    YASL_State *S = YASL_newstate("scripts/getmessage.yasl");
+    if (!S) {
+        std::cerr << "scripts/getmessage.yasl: can't find it" << std::endl;
+        return response;
+    }
+
+    // Configure state to parse JSON
+    YASL_load_json(S);
+    YASL_declglobal(S, "$");
+    patch_pushcstring(S, response.toUtf8());
+    YASL_setglobal(S, "$");
+
+    // Execute script
+    if(int status = YASL_execute(S) != YASL_MODULE_SUCCESS)
+    {
+        std::cerr << "scripts/getmessage.yasl: module failed" << std::endl;
+        return response;
+    }
+
+    // Get error message from script
+    YASL_Object* msgObj = YASL_popobject(S);
+    QString message = QString::fromUtf8(YASL_getstring(msgObj), YASL_getstringlen(msgObj));
+    YASL_delstate(S);
+
+    return message;
 }

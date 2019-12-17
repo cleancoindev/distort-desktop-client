@@ -1,0 +1,138 @@
+# if-statement to stop from declaring globals
+if $ {
+homeserver = homeserver || 'localhost:6945'
+
+# Get account from network
+const nAccount = json(send('GET', "#{homeserver}account", '', $)) ?? account
+echo "New account #{nAccount}"
+
+# Get peers from network
+const nPeers = json(send('GET', "#{homeserver}peers", '', $)) ?? peers->values()
+echo "New peers #{nPeers}"
+
+# Add and update peers
+let contained = {}
+for p <- nPeers {
+    # Expand group-string list
+    p.groups = {g->split(':')[0] : g->split(':')[1] for g <- p.groups}
+
+    const fullAddress = toFullAddress(p.peerId, p.accountName)
+    contained[fullAddress] = true
+    peers[fullAddress] = p
+}
+
+# Remove deleted peers
+for fullAddress <- peers {
+    const p = peers[fullAddress]
+
+    if !contained[fullAddress] {
+        peers->remove(fullAddress)
+    }
+}
+
+# Get groups from network
+const nGroups = json(send('GET', "#{homeserver}groups", '', $)) ?? groups->values()
+echo "New groups #{nGroups}"
+
+# Add new groups to UI and update existing
+contained = {}
+for g <- nGroups {
+    contained[g.name] = true
+    if !groups[g.name] {
+        ui.groupTree[g.name] = {}
+        ui.groupTree[g.name].convs = {}
+        ui.groupTree[g.name].item = addGroup(g.name, g.subgroupIndex, worker)
+    } elseif groups[g.name].subgroupIndex != g.subgroupIndex {
+        setSubgroupIndex(ui.groupTree[g.name].item, g.subgroupIndex, worker)
+    }
+
+    groups[g.name] = g
+}
+
+# Remove deleted groups
+for g <- groups {
+    g = groups[g]
+
+    if !contained[g.name] {
+        removeGroup(ui.groupTree[g.name].item, worker)
+        ui.groupTree->remove(g.name)
+    }
+}
+
+# If changed active group, update relevant groups
+const oActiveGroup = account.activeGroup
+const nActiveGroup = nAccount.activeGroup
+if oActiveGroup != nActiveGroup {
+    if oActiveGroup && contained[oActiveGroup] { setActiveGroup(ui.groupTree[oActiveGroup].item, false, worker) ; }
+    if nActiveGroup { setActiveGroup(ui.groupTree[nActiveGroup].item, true, worker) ; }
+}
+
+#Update account onject
+account = nAccount
+
+# Add and update conversation trees
+for fullAddress <- peers {
+    const p = peers[fullAddress]
+
+    for groupName <- p.groups {
+        const g = ui.groupTree[groupName]
+        if g {
+            if !g.convs[fullAddress] {
+                g.convs[fullAddress] = {}
+                g.convs[fullAddress].nickname = p ? p.nickname : ''
+                g.convs[fullAddress].item = addConversation(g.item, p.peerId, p.accountName, p.nickname, 0, worker)
+            } elseif g.convs[fullAddress].nickname != p.nickname {
+                g.convs[fullAddress].nickname = p.nickname
+                setConversationName(g.convs[fullAddress].item, p.nickname, worker)
+            }
+        }
+    }
+}
+
+for g <- groups {
+    g = groups[g]
+
+    # Fetch conversations in group from network
+    const escG = escape(g.name);
+    const convs = json(send('GET', "#{homeserver}groups/#{escG}", '', $)) ?? []
+    echo "New convs #{convs}"
+    conversations[g.name] = convs;
+
+    # Remove non-existant conversations in group
+    for fullAddress <- ui.groupTree[g.name].convs {
+        const p = peers[fullAddress]
+
+        if !p || p.groups[g.name] == undef {
+            removeConversation(ui.groupTree[g.name].convs[fullAddress].item, worker);
+        }
+    }
+
+    for c <- convs {
+        const msgs = json(send('GET', "#{homeserver}groups/#{escG}/0?peerId=#{c.peerId}&accountName=#{c.accountName}", '', $)) ?? {}
+        const convLabel = toConvLabel(g.name, c.peerId, c.accountName)
+        const fullAddress = toFullAddress(c.peerId, c.accountName)
+        const p = peers[fullAddress]
+        #const peerName = p ? (p.nickname || ((p.accountName && p.accountName != 'root') ? p.accountName : fullAddress)) : fullAddress
+
+        messages[convLabel] = messages[convLabel] ?? {}
+        if(msgs.in) {
+            for m <- msgs.in {
+                messages[convLabel][m.index] = m
+                if currentConv == convLabel {
+                    addOrUpdateInMessageFromBackground(m.verified, m.index, m.message, m.dateReceived, worker)
+                }
+            }
+        }
+        if(msgs.out) {
+            for m <- msgs.out {
+                messages[convLabel][m.index] = m
+                if currentConv == convLabel {
+                    addOrUpdateOutMessageFromBackground(m.status, m.index, m.message, m.lastStatusChange, worker)
+                }
+            }
+        }
+    }
+} # end group for-loop
+} # end if true block
+
+export true

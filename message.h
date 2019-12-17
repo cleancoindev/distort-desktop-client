@@ -1,7 +1,7 @@
 #ifndef MESSAGE_H
 #define MESSAGE_H
 
-#include <QString>
+#include <string>
 #include <QColor>
 
 class Message
@@ -12,17 +12,20 @@ public:
     static QColor getUnverifiedColour();
     static QColor getEnqueuedColour();
 
-    Message(QString from, QString message, uint64_t index);
-    QString getFrom() const;
+    static const QString TYPE_IN;
+    static const QString TYPE_OUT;
+
+    Message(QString message, uint64_t index);
+
     QString getMessage() const;
     uint64_t getIndex() const;
 
-    void setFrom(QString from);
+    virtual const QString& getType() const = 0;
+
     void setMessage(QString message);
     void setIndex(uint64_t index);
 
 private:
-    QString from;
     QString message;
     uint64_t index;
 };

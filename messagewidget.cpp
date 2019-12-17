@@ -1,7 +1,7 @@
 #include "messagewidget.h"
 #include "ui_messagewidget.h"
 
-MessageWidget::MessageWidget(Message m, QWidget *parent) :
+MessageWidget::MessageWidget(std::shared_ptr<Message> m, QWidget *parent) :
     QWidget(parent),
     ui(new Ui::MessageWidget),
     message(m)
@@ -14,12 +14,12 @@ MessageWidget::~MessageWidget()
     delete ui;
 }
 
-Message MessageWidget::getMessage() const
+std::shared_ptr<Message> MessageWidget::getMessage() const
 {
     return message;
 }
 
-void MessageWidget::setMessage(const Message& m)
+void MessageWidget::setMessage(std::shared_ptr<Message> m)
 {
-    message = Message(m.getFrom(), m.getMessage(), m.getIndex());
+    message = m;
 }

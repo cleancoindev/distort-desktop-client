@@ -1,0 +1,10 @@
+<RCC>
+    <qresource prefix="/images">
+        <file>res/contact.png</file>
+        <file>res/conv_single.png</file>
+        <file>res/icon_512.png</file>
+    </qresource>
+    <qresource prefix="/audio">
+        <file>res/alert_bell.wav</file>
+    </qresource>
+</RCC>

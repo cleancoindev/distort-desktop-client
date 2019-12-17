@@ -2,18 +2,18 @@
 #define DISTORTEXCEPTION_H
 
 #include <exception>
-#include <string>
+#include <QString>
 
 class DistortException : public std::exception
 {
 public:
-    DistortException(long responseCode, std::string error);
+    DistortException(long responseCode, QString error);
 
     const char* what() const noexcept;
     long getResponseCode() const;
 
 private:
-    std::string error;
+    QString error;
     long responseCode;
 };
 

@@ -1,16 +1,36 @@
 #include "conversation.h"
 
-Conversation::Conversation(uint64_t s, std::shared_ptr<Peer> p) :
-    size(s), peer(p)
+#include <sstream>
+
+Conversation::Conversation(const QString& g, const Peer& p, uint64_t s) :
+    height(s), peer(p), groupName(g)
+{}
+
+Conversation::Conversation(const Conversation& c) :
+    height(c.height), peer(c.peer), groupName(c.groupName)
+{}
+
+uint64_t Conversation::getHeight() const
 {
+    return height;
 }
 
-uint64_t Conversation::getSize() const
-{
-    return size;
-}
-
-std::shared_ptr<Peer> Conversation::getPeer() const
+const Peer& Conversation::getPeer() const
 {
     return peer;
+}
+
+QString Conversation::getGroupName() const
+{
+    return groupName;
+}
+
+QString Conversation::uniqueLabel() const
+{
+    return groupName + ":" + peer.fullAddress();
+}
+
+void Conversation::setName(QString name)
+{
+    peer.setNickname(name);
 }

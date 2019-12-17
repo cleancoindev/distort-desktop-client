@@ -1,28 +1,28 @@
 #ifndef AUTHPARAMS_H
 #define AUTHPARAMS_H
 
-#include <string>
+#include <QString>
 
 class AuthParams
 {
 public:
-    AuthParams(std::string homeserver, std::string peerId, std::string account, std::string authToken);
+    AuthParams(QString homeserver, QString peerId, QString account, QString authToken);
 
-    std::string getHomeserver() const;
-    std::string getPeerId() const;
-    std::string getAccount() const;
-    std::string getAuthToken() const;
+    QString getHomeserver() const;
+    QString getPeerId() const;
+    QString getAccount() const;
+    QString getAuthToken() const;
 
-    void setHomeserver(std::string homeserver);
-    void setPeerId(std::string peerId);
-    void setAccount(std::string account);
-    void setAuthToken(std::string authToken);
+    void setHomeserver(QString homeserver);
+    void setPeerId(QString peerId);
+    void setAccount(QString account);
+    void setAuthToken(QString authToken);
 
 private:
-    std::string homeserver;
-    std::string peerId;
-    std::string account;
-    std::string authToken;
+    QString homeserver;
+    QString peerId;
+    QString account;
+    QString authToken;
 };
 
 #endif // AUTHPARAMS_H

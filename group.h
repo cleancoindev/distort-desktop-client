@@ -7,9 +7,12 @@ class Group
 {
 public:
     Group(QString name, unsigned int subgroupIndex);
+    Group(const Group&);
 
     QString getName() const;
     unsigned int getSubgroupIndex() const;
+
+    void setSubgroupIndex(unsigned int);
 
 private:
     QString name;

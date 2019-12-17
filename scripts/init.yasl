@@ -1,0 +1,28 @@
+## Declare auth params
+let $ = {}
+
+## Declare account and conversation objects
+let account = {}
+let peers = {}
+let groups = {}
+let conversations = {}
+let currentConv = undef
+let messages = {}
+
+## Declare UI state manager
+let ui = {.groupTree: {}, .messageList: {}}
+
+## Declare helper functions
+fn toFullAddress(peerId, account) {
+    return "#{peerId}:#{account}"
+}
+fn toConvLabel(group, peerId, account) {
+    return "#{group}:#{toFullAddress(peerId,account)}"
+}
+
+## MainWindow Forward declarations
+let mainWindow = undef
+let addOrUpdateInMessage  = undef
+let addOrUpdateOutMessage = undef
+
+export true

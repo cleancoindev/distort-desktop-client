@@ -3,7 +3,7 @@
 #include "signinworker.h"
 
 SignInDialog::SignInDialog(QWidget *parent) :
-    QDialog(parent), ui(new Ui::SignInDialog), acc(nullptr), authParams(nullptr)
+    QDialog(parent), ui(new Ui::SignInDialog), authParams(nullptr)
 
 {
     ui->setupUi(this);
@@ -24,7 +24,7 @@ SignInDialog::~SignInDialog()
 
     delete ui;
     signInThread.quit();
-    signInThread.wait(3000);
+    signInThread.wait(2000);
 }
 
 std::shared_ptr<AuthParams> SignInDialog::getAuthParams() const
@@ -34,22 +34,18 @@ std::shared_ptr<AuthParams> SignInDialog::getAuthParams() const
 
 void SignInDialog::accept()
 {
-    std::string homeserver = ui->homeserverEdit->text().toStdString();
-    /*if(homeserver.empty())
-    {
-        return ui->errorLabel->setText("Must specify a homeserver network address");
-    }*/
-    homeserver = homeserver.empty() ? "http://localhost:6945/" : homeserver;
+    QString homeserver = ui->homeserverEdit->text();
+    homeserver = homeserver.isEmpty() ? "http://localhost:6945/" : homeserver;
 
     // Ensure homeserver URL's end with '/' for consistency in request-path appending
     if(homeserver.back() != '/') {
         homeserver += '/';
     }
 
-    std::string account = ui->accountEdit->text().toStdString();
-    account = account.empty() ? "root" : account;
-    std::string password = ui->passwordEdit->text().toStdString();
-    if(password.empty())
+    QString account = ui->accountEdit->text();
+    account = account.isEmpty() ? "root" : account;
+    QString password = ui->passwordEdit->text();
+    if(password.isEmpty())
     {
         return ui->errorLabel->setText("Password field cannot be empty");
     }
@@ -66,9 +62,9 @@ void SignInDialog::onSuccess(AuthParams* auth)
     done(Accepted);
 }
 
-void SignInDialog::onFailure(std::string e)
+void SignInDialog::onFailure(QString e)
 {
     QApplication::restoreOverrideCursor();
 
-    return ui->errorLabel->setText(e.c_str());
+    return ui->errorLabel->setText(e);
 }

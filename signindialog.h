@@ -1,7 +1,6 @@
 #ifndef SIGNINDIALOG_H
 #define SIGNINDIALOG_H
 
-#include "account.h"
 #include "authparams.h"
 #include "distortexception.h"
 
@@ -25,14 +24,13 @@ public:
 
 public slots:
     void onSuccess(AuthParams* authParams);
-    void onFailure(std::string e);
+    void onFailure(QString e);
 
 signals:
-    void performSignIn(std::string homeserver, std::string account, std::string password);
+    void performSignIn(QString homeserver, QString account, QString password);
 
 private:
     Ui::SignInDialog *ui;
-    std::shared_ptr<Account> acc;
     std::shared_ptr<AuthParams> authParams;
     QThread signInThread;
 

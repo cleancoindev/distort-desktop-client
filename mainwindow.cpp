@@ -7,6 +7,10 @@
 #include "restclient.h"
 #include "signindialog.h"
 #include "messagewidget.h"
+#include "backgroundworker.h"
+#include "atomicstate.h"
+#include "inmessage.h"
+#include "outmessage.h"
 
 #include <deque>
 #include <memory>
@@ -15,13 +19,75 @@
 #include <curlpp/Exception.hpp>
 #include <curlpp/Options.hpp>
 
-#include <iostream>
+namespace
+{
+    // TODO: DELETE THIS
+    void patch_pushcstring(YASL_State* S, const char* cstr)
+    {
+        size_t len = strlen(cstr);
+        char* c = (char*)malloc(len + 1);
+        memcpy(c, cstr, len);
+        c[len] = 0;
+
+        YASL_pushszstring(S, c);
+    }
+
+    int addOrUpdateInMessage(YASL_State *S)
+    {
+        // From, verified, index, message, dateReceived, worker
+        YASL_Object* w = YASL_popobject(S);
+        MainWindow* mainWindow = reinterpret_cast<MainWindow*>(YASL_getuserpointer(w));
+
+        YASL_Object* d = YASL_popobject(S);
+        QString dateReceived = QString::fromUtf8(YASL_getstring(d), YASL_getstringlen(d));
+
+        YASL_Object* m = YASL_popobject(S);
+        QString message = QString::fromUtf8(YASL_getstring(m), YASL_getstringlen(m));
+
+        YASL_Object* i = YASL_popobject(S);
+        int64_t index = YASL_getinteger(i);
+
+        YASL_Object* v = YASL_popobject(S);
+        bool verified = YASL_getboolean(v);
+
+        InMessage* im = new InMessage(verified, message, index, dateReceived);
+        mainWindow->addOrUpdateMessage(im);
+
+        YASL_pushundef(S);
+        return YASL_SUCCESS;
+    }
+    int addOrUpdateOutMessage(YASL_State *S)
+    {
+        // Status, index, message, lastStatusChange, worker
+        YASL_Object* w = YASL_popobject(S);
+        MainWindow* mainWindow = reinterpret_cast<MainWindow*>(YASL_getuserpointer(w));
+
+        YASL_Object* l = YASL_popobject(S);
+        QString lastStatusChange = QString::fromUtf8(YASL_getstring(l), YASL_getstringlen(l));
+
+        YASL_Object* m = YASL_popobject(S);
+        QString message = QString::fromUtf8(YASL_getstring(m), YASL_getstringlen(m));
+
+        YASL_Object* i = YASL_popobject(S);
+        int64_t index = YASL_getinteger(i);
+
+        YASL_Object* s = YASL_popobject(S);
+        QString status = QString::fromUtf8(YASL_getstring(s), YASL_getstringlen(s));
+
+        OutMessage* om = new OutMessage(status, message, index, lastStatusChange);
+        mainWindow->addOrUpdateMessage(om);
+
+        YASL_pushundef(S);
+        return YASL_SUCCESS;
+    }
+}
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
     messageModel(nullptr),
-    authParams(nullptr)
+    authParams(nullptr),
+    aboutWindow(nullptr)
 {
     ui->setupUi(this);
     setWindowTitle(QCoreApplication::applicationName());
@@ -31,97 +97,77 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->actionLogout->setVisible(false);
     ui->actionSettings->setVisible(false);
     ui->conversationsTree->setEnabled(false);
-    //ui->messagesList->setEnabled(false);
-    ui->messageEdit->setEnabled(false);
-    ui->sendButton->setEnabled(false);
+    toggleMessaging(false);
 
-    /*try
-    {
-        //RestClient::sendDistortRequest("GET", "http://ipfs.bootstrap.distort.network:6945/account", "QmWV77RTC7cwMPbPBfCbP68JGPt5ta8qPyiCWsUNZsXvpo", "root", "ElVd/8ULzqhzfMabtyMYVE6yI5g8D6/iAMQ1lEcWchk=");
-        //RestClient::sendDistortRequest("GET", "http://ipfs.bootstrap.distort.network:6945/groups", "QmWV77RTC7cwMPbPBfCbP68JGPt5ta8qPyiCWsUNZsXvpo", "root", "ElVd/8ULzqhzfMabtyMYVE6yI5g8D6/iAMQ1lEcWchk=");
-        //RestClient::sendDistortRequest("GET", "http://ipfs.bootstrap.distort.network:6945/groups/" + cURLpp::escape("パン"), "QmWV77RTC7cwMPbPBfCbP68JGPt5ta8qPyiCWsUNZsXvpo", "root", "ElVd/8ULzqhzfMabtyMYVE6yI5g8D6/iAMQ1lEcWchk=");
-
-        RestClient::sendDistortGet("http://ipfs.bootstrap.distort.network:6945/groups/" + cURLpp::escape("パン"), "QmWV77RTC7cwMPbPBfCbP68JGPt5ta8qPyiCWsUNZsXvpo", "root", "ElVd/8ULzqhzfMabtyMYVE6yI5g8D6/iAMQ1lEcWchk=", RestClient::emptyParams);
-
-        std::map<std::string, std::string> p;
-        p.insert(std::pair<std::string, std::string>("peerId", "QmemJHsMDuBjUCAyiWeVdct2LGHqtZhu8QQCt8ZQVbY1qz"));
-        RestClient::sendDistortAuthGet("groups/" + cURLpp::escape("パン") + "/0", authParams, p);
-    }
-    catch(curlpp::RuntimeError & e)
-    {
-        std::cerr << e.what() << std::endl;
-    }
-    catch(curlpp::LogicError & e)
-    {
-        std::cerr << e.what() << std::endl;
-    }*/
+    // Setup background worker
+    BackgroundWorker *worker = new BackgroundWorker;
+    worker->moveToThread(&backgroundThread);
+    connect(&backgroundThread, &QThread::finished, worker, &QObject::deleteLater);
+    connect(this, &MainWindow::startBackground, worker, &BackgroundWorker::doWork);
+    connect(worker, &BackgroundWorker::setActiveGroupUI, this, &MainWindow::setActiveGroup);
+    connect(worker, &BackgroundWorker::setSubgroupIndexUI, this, &MainWindow::setSubgroupIndex);
+    connect(worker, &BackgroundWorker::setConversationNameUI, this, &MainWindow::setConversationName);
+    connect(worker, &BackgroundWorker::addGroupUI, this, &MainWindow::addGroup);
+    connect(worker, &BackgroundWorker::addConvUI, this, &MainWindow::addConv);
+    connect(worker, &BackgroundWorker::removeGroupUI, this, &MainWindow::removeGroup);
+    connect(worker, &BackgroundWorker::removeConvUI, this, &MainWindow::removeConv);
+    connect(worker, &BackgroundWorker::addOrUpdateMessageUI, this, &MainWindow::addOrUpdateMessage);
+    backgroundThread.start();
 
     // Setup Messages
     ui->messagesList->setItemDelegate(new MessageDelegate);
-    ui->messagesList->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::SelectedClicked);
-    ui->messagesList->setSelectionBehavior(QAbstractItemView::SelectRows);
+    //ui->messagesList->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::SelectedClicked);
+    //ui->messagesList->setSelectionBehavior(QAbstractItemView::SelectRows);
     std::deque<std::shared_ptr<Message>> messages;
-    for(uint64_t i = 0; i < 2; i++)
-    {
-        std::shared_ptr<Message> m(new Message("hello", "hello to you good sir, the one I see before me on this splendiferous day. I see you are doing just fine over there", i));
-        messages.push_back(m);
-    }
     messageModel = new MessageListModel(messages, this);
     ui->messagesList->setModel(messageModel);
 
-    std::shared_ptr<Message> m(new Message("hello", "hello to you 12345678901234567890123456789012345678901234567890123456789012345678901234567890"
-                                                    "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"
-                                                    "1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz", 2));
-    std::shared_ptr<Message> m4(new Message("hello", "More tests X 4", 4));
-    std::shared_ptr<Message> m3(new Message("hello", "More tests X 3", 3));
-    messageModel->addOrUpdateMessage(m);
-    messageModel->addOrUpdateMessage(m4);
-    messageModel->addOrUpdateMessage(m3);
-    m3->setMessage("More tests X 3 -- EDIT");
-
-
-    // Setup groups
-    QTreeWidgetItem *group1Item = new QTreeWidgetItem();
-    ui->conversationsTree->addTopLevelItem(group1Item);
-    std::shared_ptr<Group> group1(new Group("bread", 0));
-    GroupWidget *group1Widget = new GroupWidget(group1);
-    ui->conversationsTree->setItemWidget(group1Item, 0, group1Widget);
-
-    QTreeWidgetItem *group2Item = new QTreeWidgetItem();
-    ui->conversationsTree->addTopLevelItem(group2Item);
-    std::shared_ptr<Group> group2(new Group("naan", 1));
-    GroupWidget *group2Widget = new GroupWidget(group2);
-    ui->conversationsTree->setItemWidget(group2Item, 0, group2Widget);
-
-    // Setup conversations
-    QTreeWidgetItem *conv11Item = new QTreeWidgetItem();
-    group1Item->addChild(conv11Item);
-    std::shared_ptr<Conversation> conv11(new Conversation(30, std::make_shared<Peer>(Peer("Q1234567890abcdefg", "root"))));
-    ConversationWidget *conv11Widget = new ConversationWidget(conv11);
-    ui->conversationsTree->setItemWidget(conv11Item, 1, conv11Widget);
-
-    QTreeWidgetItem *conv12Item = new QTreeWidgetItem();
-    group1Item->addChild(conv12Item);
-    std::shared_ptr<Conversation> conv12(new Conversation(0, std::make_shared<Peer>(Peer("Q987654321hijklmnop", "ryan"))));
-    ConversationWidget *conv12Widget = new ConversationWidget(conv12);
-    ui->conversationsTree->setItemWidget(conv12Item, 1, conv12Widget);
-
-    QTreeWidgetItem *conv21Item = new QTreeWidgetItem();
-    group2Item->addChild(conv21Item);
-    std::shared_ptr<Conversation> conv21(new Conversation(0, std::make_shared<Peer>(Peer("QALSKDJFHG0192837465", "trevor"))));
-    ConversationWidget *conv21Widget = new ConversationWidget(conv21);
-    ui->conversationsTree->setItemWidget(conv21Item, 1, conv21Widget);
+    // Misc connections
+    connect(ui->conversationsTree, &QTreeWidget::currentItemChanged, this, &MainWindow::onConversationSelected);
 }
 
+void MainWindow::closeEvent(QCloseEvent* closeEvent)
+{
+    // Close all open windows
+    if(aboutWindow != nullptr) delete aboutWindow;
+
+    closeEvent->accept();
+}
+void MainWindow::toggleMessaging(bool enable)
+{
+    ui->messagesList->setEnabled(enable);
+    ui->messageEdit->setEnabled(enable);
+    ui->sendButton->setEnabled(enable);
+}
 MainWindow::~MainWindow()
 {
-    delete ui;
+    // Close background thread
+    backgroundThread.requestInterruption();
+    AtomicState* state = AtomicState::getInstance();
+    state->lockState();
+    backgroundThread.quit();
+    state->unlockState();
+    backgroundThread.wait();
 
-    if(messageModel != nullptr) {
-        delete messageModel;
-    }
+    // Free main window ui
+    delete ui;
 }
 
+void MainWindow::on_actionAbout_triggered()
+{
+    if(aboutWindow == nullptr) {
+        aboutWindow = new About;
+        aboutWindow->setWindowFlags(Qt::Window);
+        aboutWindow->setAttribute(Qt::WA_DeleteOnClose);
+        aboutWindow->show();
+
+        connect(aboutWindow, &About::destroyed, this, &MainWindow::on_actionAbout_destroyed);
+    }
+}
+void MainWindow::on_actionAbout_destroyed(QObject*)
+{
+    aboutWindow = nullptr;
+}
 void MainWindow::on_actionSign_in_triggered()
 {
     SignInDialog dialog(this);
@@ -135,5 +181,113 @@ void MainWindow::on_actionSign_in_triggered()
         ui->actionLogout->setVisible(true);
         ui->actionSettings->setVisible(true);
         ui->conversationsTree->setEnabled(true);
+
+        emit startBackground(authParams->getHomeserver(), authParams->getPeerId(), authParams->getAccount(),
+                             authParams->getAuthToken(), ui->conversationsTree, ui->messagesList);
     }
+}
+
+void MainWindow::addOrUpdateMessage(Message* msg)
+{
+    std::shared_ptr<Message> msgPtr(msg);
+    messageModel->addOrUpdateMessage(msgPtr);
+}
+
+void MainWindow::onConversationSelected(QTreeWidgetItem* item, QTreeWidgetItem* old)
+{
+    if(item->parent() != nullptr)
+    {
+        // Enable messaging windows
+        toggleMessaging(true);
+
+        // Clear current conversation
+        messageModel->clearData();
+
+        AtomicState* atomicState = AtomicState::getInstance();
+        atomicState->lockState();
+        YASL_State* S = atomicState->getState();
+
+        // Pass self
+        YASL_pushuserpointer(S, this);
+        YASL_setglobal(S, "mainWindow");
+
+        // Set current conversation
+        ConversationWidget* cwgt = reinterpret_cast<ConversationWidget*>(ui->conversationsTree->itemWidget(item, 0));
+        QString name = cwgt->getConversation().getPeer().getFriendlyName();
+        patch_pushcstring(S, cwgt->getConversation().uniqueLabel().toUtf8());
+        YASL_setglobal(S, "currentConv");
+
+        // Pass addOrUpdateInMessage function
+        //YASL_declglobal(S, "addOrUpdateInMessage");
+        YASL_pushcfunction(S, addOrUpdateInMessage, 5);
+        YASL_setglobal(S, "addOrUpdateInMessage");
+
+        // Pass addOrUpdateOutMessage function
+        //YASL_declglobal(S, "addOrUpdateOutMessage");
+        YASL_pushcfunction(S, addOrUpdateOutMessage, 5);
+        YASL_setglobal(S, "addOrUpdateOutMessage");
+
+        YASL_resetstate(S, "scripts/switchconv.yasl");
+        if(!S)
+        {
+            std::cerr << "scripts/switchconv.yasl: can't find it" << std::endl;
+        }
+        else if(int status = YASL_execute(S) != YASL_MODULE_SUCCESS)
+        {
+            std::cerr << "scripts/switchconv.yasl: module failed: " << status << std::endl;
+        }
+        else
+        {
+            YASL_Object* r = YASL_popobject(S);
+            if(!YASL_getboolean(r))
+            {
+                std::cerr << "scripts/switchconv.yasl: returned failure" << std::endl;
+            }
+        }
+        atomicState->unlockState();
+    }
+}
+
+void MainWindow::setActiveGroup(QTreeWidgetItem* groupItem, bool active)
+{
+    reinterpret_cast<GroupWidget*>(ui->conversationsTree->itemWidget(groupItem, 0))->setActive(active);
+}
+
+void MainWindow::setSubgroupIndex(QTreeWidgetItem* groupItem, unsigned int index)
+{
+    reinterpret_cast<GroupWidget*>(ui->conversationsTree->itemWidget(groupItem, 0))->setSubgroupIndex(index);
+}
+
+void MainWindow::setConversationName(QTreeWidgetItem* convItem, QString name)
+{
+    reinterpret_cast<ConversationWidget*>(ui->conversationsTree->itemWidget(convItem, 0))->setName(name);
+}
+
+void MainWindow::addGroup(QString name, unsigned int index, QTreeWidgetItem* groupItem)
+{
+    Group g(name, index);
+    GroupWidget* widget = new GroupWidget(g);
+    ui->conversationsTree->addTopLevelItem(groupItem);
+    ui->conversationsTree->setItemWidget(groupItem, 0, widget);
+}
+
+void MainWindow::addConv(QTreeWidgetItem* groupItem, QString peerId, QString account, QString nickname, unsigned int height, QTreeWidgetItem* convItem)
+{
+    QTreeWidget* convTree = groupItem->treeWidget();
+    GroupWidget* gwgt = reinterpret_cast<GroupWidget*>(convTree->itemWidget(groupItem, 0));
+
+    Conversation conv(gwgt->getGroup().getName(), Peer(peerId, account, nickname), height);
+    ConversationWidget* widget = new ConversationWidget(conv);
+    groupItem->addChild(convItem);
+    ui->conversationsTree->setItemWidget(convItem, 0, widget);
+}
+
+void MainWindow::removeGroup(QTreeWidgetItem* groupItem)
+{
+    delete groupItem;
+}
+
+void MainWindow::removeConv(QTreeWidgetItem* convItem)
+{
+    delete convItem;
 }

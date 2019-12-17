@@ -1,5 +1,3 @@
-
 const x = json($)
-echo x
-
+echo "RESTCLIENT: #{x}"
 export x

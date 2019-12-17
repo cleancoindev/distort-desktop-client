@@ -4,18 +4,25 @@
 #include "peer.h"
 
 #include <memory>
+#include <string>
 
 class Conversation
 {
 public:
-    Conversation(uint64_t size, std::shared_ptr<Peer> peer);
+    Conversation(const QString& groupName, const Peer& peer, uint64_t height);
+    Conversation(const Conversation&);
 
-    uint64_t getSize() const;
-    std::shared_ptr<Peer> getPeer() const;
+    const Peer& getPeer() const;
+    uint64_t getHeight() const;
+    QString getGroupName() const;
+    QString uniqueLabel() const;
+
+    void setName(QString name);
 
 private:
-    uint64_t size;
-    std::shared_ptr<Peer> peer;
+    uint64_t height;
+    Peer peer;
+    QString groupName;
 };
 
 #endif // CONVERSATION_H

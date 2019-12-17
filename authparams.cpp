@@ -1,6 +1,6 @@
 #include "authparams.h"
 
-AuthParams::AuthParams(std::string h, std::string p, std::string acc, std::string auth) :
+AuthParams::AuthParams(QString h, QString p, QString acc, QString auth) :
     homeserver(h), peerId(p), account(acc), authToken(auth)
 {
     // Ensure homeserver URL's end with '/' for consistency in request-path appending
@@ -9,42 +9,42 @@ AuthParams::AuthParams(std::string h, std::string p, std::string acc, std::strin
     }
 }
 
-std::string AuthParams::getHomeserver() const
+QString AuthParams::getHomeserver() const
 {
     return homeserver;
 }
 
-std::string AuthParams::getPeerId() const
+QString AuthParams::getPeerId() const
 {
     return peerId;
 }
 
-std::string AuthParams::getAccount() const
+QString AuthParams::getAccount() const
 {
     return account;
 }
 
-std::string AuthParams::getAuthToken() const
+QString AuthParams::getAuthToken() const
 {
     return authToken;
 }
 
-void AuthParams::setHomeserver(std::string h)
+void AuthParams::setHomeserver(QString h)
 {
     homeserver = h;
 }
 
-void AuthParams::setPeerId(std::string p)
+void AuthParams::setPeerId(QString p)
 {
     peerId = p;
 }
 
-void AuthParams::setAccount(std::string a)
+void AuthParams::setAccount(QString a)
 {
     account = a;
 }
 
-void AuthParams::setAuthToken(std::string a)
+void AuthParams::setAuthToken(QString a)
 {
     authToken = a;
 }

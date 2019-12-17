@@ -1,23 +1,57 @@
 #include "atomicstate.h"
 
-std::mutex mtx;
-std::shared_ptr<AtomicState> atomicState(nullptr);
-AtomicState::AtomicState() {}
+#include <iostream>
 
-std::shared_ptr<AtomicState> AtomicState::getInstance()
+extern "C"
+{
+    #include "yasl/yasl_state.h"
+    #include "json.yasl/json.h"
+}
+
+static std::mutex mtx;
+static AtomicState* atomicState;
+
+AtomicState::AtomicState()
+{
+    // Initialize an empty environment that supports JSON extension
+    state = YASL_newstate("scripts/init.yasl");
+    if(!state) {
+        std::cerr << "scripts/init.yasl: can't find it" << std::endl;
+        exit(-10);
+    }
+    YASL_load_json(state);
+
+    if(int status = YASL_execute(state) != YASL_MODULE_SUCCESS)
+    {
+        std::cerr << "scripts/init.yasl: module failed" << std::endl;
+        std::cerr << "YASL state is required, aborting" << std::endl;
+        exit(-1);
+    }
+
+    YASL_Object* r = YASL_popobject(state);
+    if(!YASL_getboolean(r))
+    {
+        std::cerr << "scripts/init.yasl: returned failure" << std::endl;
+        std::cerr << "YASL state is required, aborting" << std::endl;
+        exit(-1);
+    }
+}
+
+AtomicState::~AtomicState()
+{
+    YASL_delstate(state);
+}
+
+AtomicState* AtomicState::getInstance()
 {
     mtx.lock();
-    if(atomicState != nullptr)
+    if(!atomicState)
     {
-        mtx.unlock();
-        return atomicState;
+        atomicState = new AtomicState;
     }
-    else
-    {
-        atomicState = std::make_shared<AtomicState>(AtomicState());
-        mtx.unlock();
-        return atomicState;
-    }
+
+    mtx.unlock();
+    return atomicState;
 }
 
 void AtomicState::lockState()
@@ -30,19 +64,8 @@ void AtomicState::unlockState()
     mtx.unlock();
 }
 
-const std::shared_ptr<YASL_Object> AtomicState::getAccount() const
+YASL_State* AtomicState::getState()
 {
-    return account;
+    return state;
 }
-const std::shared_ptr<YASL_Object> AtomicState::getGroups() const
-{
-    return groups;
-}
-const std::shared_ptr<YASL_Object> AtomicState::getConversations(std::string groupName) const
-{
-    return conversations.at(groupName);
-}
-const std::shared_ptr<YASL_Object> AtomicState::getMessages(std::string conversationLabel) const
-{
-    return messages.at(conversationLabel);
-}
+

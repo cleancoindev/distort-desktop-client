@@ -25,7 +25,7 @@ DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs depr
 CONFIG += c++11
 
 SOURCES += \
-        account.cpp \
+        about.cpp \
         atomicstate.cpp \
         authparams.cpp \
         backgroundworker.cpp \
@@ -34,6 +34,7 @@ SOURCES += \
         distortexception.cpp \
         group.cpp \
         groupwidget.cpp \
+        inmessage.cpp \
         json.yasl/json.c \
         main.cpp \
         mainwindow.cpp \
@@ -41,13 +42,14 @@ SOURCES += \
         messagedelegate.cpp \
         messagelistmodel.cpp \
         messagewidget.cpp \
+        outmessage.cpp \
         peer.cpp \
         restclient.cpp \
         signindialog.cpp \
         signinworker.cpp
 
 HEADERS += \
-        account.h \
+        about.h \
         atomicstate.h \
         authparams.h \
         backgroundworker.h \
@@ -56,18 +58,21 @@ HEADERS += \
         distortexception.h \
         group.h \
         groupwidget.h \
+        inmessage.h \
         json.yasl/json.h \
         mainwindow.h \
         message.h \
         messagedelegate.h \
         messagelistmodel.h \
         messagewidget.h \
+        outmessage.h \
         peer.h \
         restclient.h \
         signindialog.h \
         signinworker.h
 
 FORMS += \
+        about.ui \
         conversationwidget.ui \
         groupitem.ui \
         mainwindow.ui \
@@ -84,7 +89,17 @@ unix|win32: LIBS += -lcurlpp -lcurl
 unix|win32: LIBS += -lcryptopp
 
 DISTFILES += \
-    scripts/restclient.yasl
+    res/alert_bell.wav \
+    res/contact.png \
+    res/conv_single.png \
+    res/icon_512.png \
+    scripts/background.yasl \
+    scripts/drawmessage.yasl \
+    scripts/geterror.yasl \
+    scripts/getmessage.yasl \
+    scripts/init.yasl \
+    scripts/restclient.yasl \
+    scripts/switchconv.yasl
 
 ## Include YASL
 INCLUDEPATH += $$PWD/yasl
@@ -108,3 +123,6 @@ first.depends = $(first) copydata
 export(first.depends)
 export(copydata.commands)
 QMAKE_EXTRA_TARGETS += first copydata
+
+RESOURCES += \
+    resources.qrc

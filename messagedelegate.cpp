@@ -1,24 +1,23 @@
 #include "messagedelegate.h"
 #include "messagelistmodel.h"
+#include "inmessage.h"
+#include "outmessage.h"
 
 #include <QPainter>
 #include <QApplication>
 #include <messagewidget.h>
 
 MessageDelegate::MessageDelegate(QObject* parent) :
-    QStyledItemDelegate(parent)
-{
-}
+    QStyledItemDelegate(parent) {}
 
 void MessageDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
     const QModelIndex& index) const
 {
     // Get relevent message fields
-    QString from = index.data(MessageListModel::fromRole).toString();
+    bool inMessage = index.data(MessageListModel::typeRole).toString() == Message::TYPE_IN;
+    QString from = inMessage ? peerName : "~";
     QString message = index.data(MessageListModel::messageRole).toString();
-    uint i = index.data(MessageListModel::indexRole).toUInt();
-
-    bool inMessage = i%2==0;
+    QString dateString = inMessage ? index.data(MessageListModel::dateReceivedRole).toString() : index.data(MessageListModel::lastStatusChangeRole).toString();
 
     // Ensure antialiasing
     painter->setRenderHint(QPainter::Antialiasing);
@@ -33,7 +32,14 @@ void MessageDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
     QRect bubble = inMessage ? QRect(rect.left()+4, rect.top()+4, MESSAGE_WIDTH, rect.height()-8) : QRect(rect.right()-MESSAGE_WIDTH-4, rect.top()+4, MESSAGE_WIDTH, rect.height()-8);
     QPainterPath path;
     path.addRoundedRect(bubble, 12, 8);
-    painter->fillPath(path, inMessage ? Message::getInColour() : Message::getSentColour());
+    if(inMessage)
+    {
+        painter->fillPath(path, index.data(MessageListModel::verifiedRole).toBool() ? Message::getInColour() : Message::getUnverifiedColour());
+    }
+    else
+    {
+        painter->fillPath(path, index.data(MessageListModel::statusRole).toString() == "sent" ? Message::getSentColour() : Message::getEnqueuedColour());
+    }
 
     // Draw text
     int textAlign = inMessage ? Qt::AlignLeft : Qt::AlignRight;
@@ -90,20 +96,18 @@ void MessageDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
     if(inMessage)
     {
         painter->drawText(QRect(rect.left()+4, rect.bottom()-MARGIN-height, MESSAGE_WIDTH-MARGIN, height),
-            Qt::AlignRight, "11:22:33T12:43.123");
+            Qt::AlignRight, dateString);
     }
     else
     {
         painter->drawText(QRect(rect.right()-4-MAX_MESSAGE_WIDTH+MARGIN, rect.bottom()-MARGIN-height, MESSAGE_WIDTH-MARGIN, height),
-            Qt::AlignLeft, "11:22:33T12:43.123");
+            Qt::AlignLeft, dateString);
     }
 }
 
 QSize MessageDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
     QSize result = QStyledItemDelegate::sizeHint(option, index);
-
-    // TODO: Why necessary ??
     result.setWidth(MAX_MESSAGE_WIDTH + 8);
 
     // Get pixel length of message and count of rows
@@ -115,35 +119,51 @@ QSize MessageDelegate::sizeHint(const QStyleOptionViewItem& option, const QModel
     int r = l / result.width() + 1;
 
     result.setHeight(height*(r+2) + 2*MARGIN + TEXT_MARGIN + 8);
-    // result.setHeight(result.height()*3 + 2*MARGIN);
     return result;
 }
 
-QWidget* MessageDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
+QWidget* MessageDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
-    // Get relevent message fields
-    QString from = index.data(MessageListModel::fromRole).toString();
-    QString message = index.data(MessageListModel::messageRole).toString();
-    uint i = index.data(MessageListModel::indexRole).toUInt();
+    bool inMessage = index.data(MessageListModel::typeRole).toString() == Message::TYPE_IN;
 
-    return new MessageWidget(Message(from, message, i), parent);
+    QString m = index.data(MessageListModel::messageRole).toString();
+    uint64_t i = index.data(MessageListModel::indexRole).toLongLong();
+    QString type = index.data(MessageListModel::typeRole).toString();
+
+    std::shared_ptr<Message> message;
+    if(inMessage)
+    {
+        bool v = index.data(MessageListModel::verifiedRole).toBool();
+        QString date = index.data(MessageListModel::dateReceivedRole).toString();
+        message.reset(new InMessage(v, m, i, date));
+    }
+    else
+    {
+        QString status = index.data(MessageListModel::statusRole).toString();
+        QString lastStatusChange = index.data(MessageListModel::lastStatusChangeRole).toString();
+        message.reset(new OutMessage(status, m, i, lastStatusChange));
+    }
+
+    MessageWidget* editor = new MessageWidget(message, parent);
+    return editor;
 }
 
-void MessageDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
+void MessageDelegate::setEditorData(QWidget *editor, const QModelIndex &index) const
 {
-    // No input fields
-    QStyledItemDelegate::setEditorData(editor, index);
+    return;
 }
 
 void MessageDelegate::setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const
 {
-    // No input fields
-    QStyledItemDelegate::setModelData(editor, model, index);
+    return;
 }
 
-void MessageDelegate::updateEditorGeometry(QWidget *editor,
-                                           const QStyleOptionViewItem &option,
-                                           const QModelIndex &/* index */) const
+void MessageDelegate::updateEditorGeometry(QWidget *editor, const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
     editor->setGeometry(option.rect);
+}
+
+void MessageDelegate::setPeerName(QString name)
+{
+    peerName = name;
 }

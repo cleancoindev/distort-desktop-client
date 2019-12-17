@@ -1,0 +1,14 @@
+# If conversation exists, add all messages to UI
+if messages[currentConv] {
+    for i <- messages[currentConv] {
+        const m = messages[currentConv][i]
+
+        # Only and all in-messages contain a dateReceived field
+        if m.dateReceived {
+            addOrUpdateInMessage(m.verified, m.index, m.message, m.dateReceived, mainWindow)
+        } else {
+            addOrUpdateOutMessage(m.status, m.index, m.message, m.lastStatusChange, mainWindow)
+        }
+    }
+}
+export true

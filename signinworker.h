@@ -14,10 +14,10 @@ public:
 
 signals:
     void success(AuthParams* authParams);
-    void failure(std::string e);
+    void failure(QString e);
 
 public slots:
-    void doWork(std::string homeserver, std::string account, std::string password);
+    void doWork(QString homeserver, QString account, QString password);
 };
 
 #endif // SIGNINWORKER_H

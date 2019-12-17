@@ -15,12 +15,18 @@ class GroupWidget : public QWidget
     Q_OBJECT
 
 public:
-    explicit GroupWidget(std::shared_ptr<Group> group, QWidget *parent = nullptr);
+    explicit GroupWidget(Group group, QWidget *parent = nullptr);
     ~GroupWidget();
+
+    void setActive(bool active);
+    void setSubgroupIndex(unsigned int index);
+    const Group& getGroup() const;
 
 private:
     Ui::GroupItem *ui;
-    std::shared_ptr<Group> group;
+    Group group;
+
+    void setSubgroupText(unsigned int index);
 };
 
 #endif // GROUPITEM_H

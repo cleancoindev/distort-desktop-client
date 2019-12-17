@@ -15,12 +15,15 @@ class ConversationWidget : public QWidget
     Q_OBJECT
 
 public:
-    explicit ConversationWidget(std::shared_ptr<Conversation> conversation, QWidget *parent = nullptr);
+    explicit ConversationWidget(Conversation conversation, QWidget *parent = nullptr);
     ~ConversationWidget();
+
+    void setName(QString name);
+    const Conversation& getConversation() const;
 
 private:
     Ui::ConversationWidget *ui;
-    std::shared_ptr<Conversation> conversation;
+    Conversation conversation;
 };
 
 #endif // CONVERSATIONWIDGET_H

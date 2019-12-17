@@ -1,0 +1,3 @@
+const m = (json($) ?? {}).message ?? $->tostr()
+echo "GETMESSAGE: #{m}"
+export m
